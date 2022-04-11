@@ -37,6 +37,12 @@
 
 		let controller1, controller2;
 		let controllerGrip1, controllerGrip2;
+		let raycaster;
+
+		const intersected = [];
+		const raycastGroup = new THREE.Group();
+		const tempMatrix = new THREE.Matrix4();
+
 
 		// earth textures
 		const texture = new THREE.TextureLoader().load( 'textures/earth_atmos_2048.jpeg' );
@@ -79,8 +85,8 @@
 		//creating clouds from material and geometry
 		const sphere2 = new THREE.Mesh(geometry2, material2);
 		//creating light
-		const light = new THREE.AmbientLight( 0x404040, 10 );
-		const DirectionalLight = new THREE.DirectionalLight(0xFFFFFF);
+		const light = new THREE.AmbientLight( 0x404040, 5 );
+		const DirectionalLight = new THREE.DirectionalLight(0xFFFFFF, 5);
 		//creating axes helper
 		const axesHelper = new THREE.AxesHelper(5);
 		//creating ktx2 loader
@@ -91,8 +97,15 @@
 
 		//creating hemisphere lighting
 		const hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
-
-
+		//floor
+		const ground = new THREE.Mesh(
+					new THREE.PlaneGeometry( 10, 10, 1, 1 ),
+					new THREE.MeshPhongMaterial( { color: 0x292724, shininess: -20 } )
+				);
+				ground.position.set(0, -1, 0);
+				ground.rotation.x = - Math.PI / 2; // rotates X/Y to X/Z
+				ground.receiveShadow = true;
+				scene.add( ground );
 		//set texture as scene background
 		scene.background = cubeTexture;
 
@@ -111,10 +124,18 @@
 			{
 				console.log(gltf);
 				gltf.scene.scale.set(0.001, 0.001, 0.001);
-				gltf.scene.position.set(-2, 0, -1);
+				gltf.scene.position.set(-2, 1, -1);
+				gltf.scene.traverse( function( node ) {
+                       if( node.material ) {
+                           node.material.side = THREE.DoubleSide;
+                           node.castShadow = true;
+                           node.receiveShadow = true;
+                       }
+                  });
 
 
 				scene.add(gltf.scene);
+				raycastGroup.add(gltf.scene);
 			}
 		);
 		
@@ -125,7 +146,22 @@
 		renderer.xr.enabled = true;
 		document.body.appendChild(renderer.domElement);
 		document.body.appendChild( VRButton.createButton( renderer ) );
+		renderer.shadowMapEnabled = true;
+		renderer.shadowMapType = THREE.PCFSoftShadowMap;
 
+
+		DirectionalLight.castShadow = true; // default false
+
+		//Set up shadow properties for the light
+	
+
+		DirectionalLight.position.set(0,6,2);
+		DirectionalLight.castShadow = true;
+		DirectionalLight.shadow.camera.top = 4;
+		DirectionalLight.shadow.camera.bottom = - 4;
+		DirectionalLight.shadow.camera.right = 4;
+		DirectionalLight.shadow.camera.left = - 4;
+		DirectionalLight.shadow.mapSize.set( 4096, 4096 );
 
 		//add all the above to scene
 		scene.add(sphere);
@@ -135,9 +171,17 @@
 		scene.add(DirectionalLight);
 		scene.add( hemiLight );
 
+		//Add them to group
+		raycastGroup.add(sphere);
+		raycastGroup.add(sphere2);
+
 		//sphere settings
 		sphere.position.set(-1, 1, 2);
 		sphere2.position.set(-1, 1, 2);
+		sphere.castShadow = true;
+		sphere2.castShadow = true;		
+		sphere.receiveShadow = true;
+		sphere2.receiveShadow = true;
 		sphere.scale.set(0.5, 0.5, 0.5);
 		sphere2.scale.set(0.5, 0.5, 0.5);
 
@@ -181,6 +225,7 @@
 				controller2.add(mymodel);		
 			}
 		);
+
 		loader2.load('scene.gltf', function(gltf)
 			{
 				gltf.scene.scale.set(0.003, 0.003, 0.003);
@@ -190,40 +235,32 @@
 				controller1.add(mymodel);		
 			}
 		);
-		// controllerGrip1 = renderer.xr.getControllerGrip( 0 );
-		// controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
-		// scene.add( controllerGrip1 );
-
-		// controllerGrip2 = renderer.xr.getControllerGrip( 1 );
-		// controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
-		// scene.add( controllerGrip2 );
-
-		//Add rays
 
 		const geometry1 = new THREE.BufferGeometry().setFromPoints( [ new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, 0, - 1 ) ] );
+
+
 
 		const line = new THREE.Line( geometry1 );
 		line.name = 'line';
 		line.scale.z = 5;
 
+
+
 		controller1.add( line.clone() );
 		controller2.add( line.clone() );
 
-		// raycaster = new THREE.Raycaster();
 
-		function onSelectStart(){
+		
+		raycaster = new THREE.Raycaster();
 
-		}
-		function onSelectEnd(){
 
-		}
-
-		//
 		renderer.setAnimationLoop( function () {
 
 			renderer.render( scene, camera );
 
 		} );
+
+
 
 		//function to resize when window size changes
 		function onWindowResize() {
@@ -232,7 +269,11 @@
 			renderer.setSize(window.innerWidth, window.innerHeight);
 		}
 
+
+
 		window.addEventListener('resize', onWindowResize, false);
+
+
 
 		//function to rotate our objects
 		function animate() {
@@ -245,6 +286,96 @@
 			controls.update();
 			renderer.render(scene, camera);
 		};
+
+
+
+		function onSelectStart( event ) {
+
+		const controller = event.target;
+
+		const intersections = getIntersections( controller );
+
+			if ( intersections.length > 0 ) {
+
+				const intersection = intersections[ 0 ];
+
+				const object = intersection.object;
+				object.material.emissive.b = 1;
+				controller.attach( object );
+
+				controller.userData.selected = object;
+
+			}
+
+		}
+
+			function onSelectEnd( event ) {
+
+			const controller = event.target;
+
+			if ( controller.userData.selected !== undefined ) {
+
+				const object = controller.userData.selected;
+				object.material.emissive.b = 0;
+				raycastGroup.attach( object );
+
+				controller.userData.selected = undefined;
+
+			}
+
+
+		}
+
+		function getIntersections( controller ) {
+
+			tempMatrix.identity().extractRotation( controller.matrixWorld );
+
+			raycaster.ray.origin.setFromMatrixPosition( controller.matrixWorld );
+			raycaster.ray.direction.set( 0, 0, - 1 ).applyMatrix4( tempMatrix );
+
+			return raycaster.intersectObjects( raycastGroup.children, true );
+
+		}	
+		
+		function intersectObjects( controller ) {
+
+		// Do not highlight when already selected
+
+			if ( controller.userData.selected !== undefined ) return;
+
+			const line = controller.getObjectByName( 'line' );
+			const intersections = getIntersections( controller );
+
+			if ( intersections.length > 0 ) {
+
+				const intersection = intersections[ 0 ];
+
+				const object = intersection.object;
+				object.material.emissive.r = 1;
+				intersected.push( object );
+
+				line.scale.z = intersection.distance;
+
+			} else {
+
+				line.scale.z = 5;
+
+			}
+
+		}
+
+
+		function cleanIntersected() {
+
+			while ( intersected.length ) {
+
+				const object = intersected.pop();
+				object.material.emissive.r = 0;
+
+			}
+
+		}
+
 
 		animate();
 	
