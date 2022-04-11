@@ -125,7 +125,7 @@
 			{
 				console.log(gltf);
 				gltf.scene.children[0].scale.set(0.001, 0.001, 0.001);
-				gltf.scene.children[0].position.set(-2, 1, -1);
+				gltf.scene.children[0].position.set(1, 1, 1);
 				gltf.scene.traverse( function( node ) {
                        if( node.material ) {
                            node.material.side = THREE.DoubleSide;
