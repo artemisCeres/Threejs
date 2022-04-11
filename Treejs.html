@@ -41,6 +41,7 @@
 
 		const intersected = [];
 		const raycastGroup = new THREE.Group();
+		const earth = new THREE.Group();
 		const tempMatrix = new THREE.Matrix4();
 
 
@@ -123,8 +124,8 @@
 		loader.load('gengar.glb', function(gltf)
 			{
 				console.log(gltf);
-				gltf.scene.scale.set(0.001, 0.001, 0.001);
-				gltf.scene.position.set(-2, 1, -1);
+				gltf.scene.children[0].scale.set(0.001, 0.001, 0.001);
+				gltf.scene.children[0].position.set(-2, 1, -1);
 				gltf.scene.traverse( function( node ) {
                        if( node.material ) {
                            node.material.side = THREE.DoubleSide;
@@ -134,8 +135,7 @@
                   });
 
 
-				scene.add(gltf.scene);
-				raycastGroup.add(gltf.scene);
+				raycastGroup.add(gltf.scene.children[0]);
 			}
 		);
 		
@@ -163,17 +163,20 @@
 		DirectionalLight.shadow.camera.left = - 4;
 		DirectionalLight.shadow.mapSize.set( 4096, 4096 );
 
+
+		//Add them to group
+		earth.add(sphere);
+		// earth.add(sphere2);
+		raycastGroup.add(earth);
+
 		//add all the above to scene
-		scene.add(sphere);
-		scene.add(sphere2);
+
 		scene.add( light );		
 		scene.add(axesHelper);
 		scene.add(DirectionalLight);
 		scene.add( hemiLight );
+		scene.add(raycastGroup);
 
-		//Add them to group
-		raycastGroup.add(sphere);
-		raycastGroup.add(sphere2);
 
 		//sphere settings
 		sphere.position.set(-1, 1, 2);
@@ -250,7 +253,7 @@
 		controller2.add( line.clone() );
 
 
-		
+
 		raycaster = new THREE.Raycaster();
 
 
@@ -291,90 +294,102 @@
 
 		function onSelectStart( event ) {
 
-		const controller = event.target;
+				const controller = event.target;
 
-		const intersections = getIntersections( controller );
+				const intersections = getIntersections( controller );
 
-			if ( intersections.length > 0 ) {
+				if ( intersections.length > 0 ) {
 
-				const intersection = intersections[ 0 ];
+					const intersection = intersections[ 0 ];
 
-				const object = intersection.object;
-				object.material.emissive.b = 1;
-				controller.attach( object );
+					const object = intersection.object;
+					object.material.emissive.b = 1;
+					controller.attach( object );
 
-				controller.userData.selected = object;
+					controller.userData.selected = object;
+
+				}
 
 			}
-
-		}
 
 			function onSelectEnd( event ) {
 
-			const controller = event.target;
+				const controller = event.target;
 
-			if ( controller.userData.selected !== undefined ) {
+				if ( controller.userData.selected !== undefined ) {
 
-				const object = controller.userData.selected;
-				object.material.emissive.b = 0;
-				raycastGroup.attach( object );
+					const object = controller.userData.selected;
+					object.material.emissive.b = 0;
+					raycastGroup.attach( object );
 
-				controller.userData.selected = undefined;
+					controller.userData.selected = undefined;
+
+				}
+
 
 			}
 
+			function getIntersections( controller ) {
 
-		}
+				tempMatrix.identity().extractRotation( controller.matrixWorld );
 
-		function getIntersections( controller ) {
+				raycaster.ray.origin.setFromMatrixPosition( controller.matrixWorld );
+				raycaster.ray.direction.set( 0, 0, - 1 ).applyMatrix4( tempMatrix );
 
-			tempMatrix.identity().extractRotation( controller.matrixWorld );
-
-			raycaster.ray.origin.setFromMatrixPosition( controller.matrixWorld );
-			raycaster.ray.direction.set( 0, 0, - 1 ).applyMatrix4( tempMatrix );
-
-			return raycaster.intersectObjects( raycastGroup.children, true );
-
-		}	
-		
-		function intersectObjects( controller ) {
-
-		// Do not highlight when already selected
-
-			if ( controller.userData.selected !== undefined ) return;
-
-			const line = controller.getObjectByName( 'line' );
-			const intersections = getIntersections( controller );
-
-			if ( intersections.length > 0 ) {
-
-				const intersection = intersections[ 0 ];
-
-				const object = intersection.object;
-				object.material.emissive.r = 1;
-				intersected.push( object );
-
-				line.scale.z = intersection.distance;
-
-			} else {
-
-				line.scale.z = 5;
+				return raycaster.intersectObjects( raycastGroup.children, true );
 
 			}
 
-		}
+			function intersectObjects( controller ) {
 
+				// Do not highlight when already selected
 
-		function cleanIntersected() {
+				if ( controller.userData.selected !== undefined ) return;
 
-			while ( intersected.length ) {
+				const line = controller.getObjectByName( 'line' );
+				const intersections = getIntersections( controller );
 
-				const object = intersected.pop();
-				object.material.emissive.r = 0;
+				if ( intersections.length > 0 ) {
+
+					const intersection = intersections[ 0 ];
+
+					const object = intersection.object;
+					object.material.emissive.r = 1;
+					intersected.push( object );
+
+					line.scale.z = intersection.distance;
+
+				} else {
+
+					line.scale.z = 5;
+
+				}
 
 			}
 
-		}
+			function cleanIntersected() {
+
+				while ( intersected.length ) {
+
+					const object = intersected.pop();
+					object.material.emissive.r = 0;
+
+				}
+
+			}
+
+			//
+
+			function render() {
+
+				cleanIntersected();
+
+				intersectObjects( controller1 );
+				intersectObjects( controller2 );
+
+				renderer.render( scene, camera );
+
+			}
 
 
 		animate();
