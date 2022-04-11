@@ -61,7 +61,7 @@
 		//creating scene
 		const scene = new THREE.Scene();
 		//creating renderer
-		const renderer = new THREE.WebGLRenderer();
+		const renderer = new THREE.WebGLRenderer({ antialias: true } );
 		//creating camera
 		const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 		//creating controls
@@ -87,6 +87,8 @@
 		const ktx2Loader = new KTX2Loader();
 		//creating gltf loader
 		const loader = new GLTFLoader().setPath( 'gengar/' );
+		const loader2 = new GLTFLoader().setPath('gundy/');
+
 		//creating hemisphere lighting
 		const hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
 
@@ -111,9 +113,11 @@
 				gltf.scene.scale.set(0.001, 0.001, 0.001);
 				gltf.scene.position.set(-2, 0, -1);
 
+
 				scene.add(gltf.scene);
 			}
 		);
+		
 
 		//renderer settings
 		controls.listenToKeyEvents( window );
@@ -132,8 +136,10 @@
 		scene.add( hemiLight );
 
 		//sphere settings
-		sphere.position.set(-1, 2, 2);
-		sphere2.position.set(-1, 2, 2);
+		sphere.position.set(-1, 1, 2);
+		sphere2.position.set(-1, 1, 2);
+		sphere.scale.set(0.5, 0.5, 0.5);
+		sphere2.scale.set(0.5, 0.5, 0.5);
 
 
 		//control settings
@@ -152,7 +158,7 @@
 
 		console.log(scene);
 		
-// controllers
+		// controllers
 
 		controller1 = renderer.xr.getController( 0 );
 		controller1.addEventListener( 'selectstart', onSelectStart );
@@ -166,13 +172,31 @@
 
 		const controllerModelFactory = new XRControllerModelFactory();
 
-		controllerGrip1 = renderer.xr.getControllerGrip( 0 );
-		controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
-		scene.add( controllerGrip1 );
+		loader2.load('scene.gltf', function(gltf)
+			{
+				gltf.scene.scale.set(0.003, 0.003, 0.003);
+				let mymodel = gltf.scene;
+				mymodel.rotation.y = THREE.Math.degToRad(180);
+				mymodel.position.set(0, -0.3, 0);
+				controller2.add(mymodel);		
+			}
+		);
+		loader2.load('scene.gltf', function(gltf)
+			{
+				gltf.scene.scale.set(0.003, 0.003, 0.003);
+				let mymodel = gltf.scene;
+				mymodel.rotation.y = THREE.Math.degToRad(180);
+				mymodel.position.set(0, -0.3, 0);
+				controller1.add(mymodel);		
+			}
+		);
+		// controllerGrip1 = renderer.xr.getControllerGrip( 0 );
+		// controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
+		// scene.add( controllerGrip1 );
 
-		controllerGrip2 = renderer.xr.getControllerGrip( 1 );
-		controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
-		scene.add( controllerGrip2 );
+		// controllerGrip2 = renderer.xr.getControllerGrip( 1 );
+		// controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
+		// scene.add( controllerGrip2 );
 
 		//Add rays
 
@@ -217,6 +241,7 @@
 			// sphere.rotation.x += 0.005;
 			sphere.rotation.y += 0.004;
 			sphere2.rotation.y += 0.0035;
+
 			controls.update();
 			renderer.render(scene, camera);
 		};
